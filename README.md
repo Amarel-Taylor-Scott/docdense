@@ -4,6 +4,10 @@
 > text** — deterministically, with the stdlib, so an LLM never burns tokens
 > pulling down and wading through raw HTML. Fetch → strip boilerplate → clean
 > Markdown → densify → heading-aware chunks → a token-savings report.
+>
+> Then **host the condensed docs for the frameworks your team uses** — a tiny
+> registry server agents query instead of crawling raw doc sites — and let
+> framework maintainers **publish their own** docpacks.
 
 ```
 fetch/crawl ─▶ extract (HTML→Markdown,    ─▶ densify (dedupe nav, drop ─▶ chunk (by heading, ─▶ chunks.jsonl
@@ -62,6 +66,64 @@ host, capped by `--max-pages`; `--whole-site` widens it to the whole host.
 - **Chunk** (`chunk.py`): split on headings, attach the breadcrumb, merge tiny
   sections, window oversized ones with overlap.
 
+## Host condensed docs for your stack (registry)
+
+Beyond a one-off CLI, docdense is a small **condensed-docs platform**. The unit
+of distribution is a **docpack** — a directory (or single `.docpack` zip) with a
+`manifest.json`, the `chunks.jsonl`, and `combined.md` for one framework.
+
+**Publisher** — a framework's maintainers (or your platform team) condense a doc
+site into a docpack:
+
+```bash
+docdense pack https://flask.palletsprojects.com/ --crawl --max-pages 60 \
+        --name flask --version 3.0 -o registry/flask
+docdense pack https://numpy.org/doc/stable/ --crawl --name numpy --version 2.0 \
+        -o registry/numpy --zip          # a single registry/numpy.docpack
+```
+
+**Host** — point the server at a folder of docpacks; now it's one searchable,
+condensed-docs library for everything your team uses:
+
+```bash
+docdense serve registry/ --port 8900
+```
+
+```
+GET /api/frameworks                      what's hosted (+ token stats)
+GET /api/search?q=blueprint+routing      ranked condensed chunks (TF·IDF, no embeddings)
+GET /api/doc/<name>                       a framework's manifest
+GET /api/doc/<name>/chunks                its chunks.jsonl (ndjson, RAG-ready)
+GET /api/doc/<name>/md                    its combined dense markdown
+```
+
+An **agent** hits `/api/search?q=...` and gets back exactly the dense chunks it
+needs — no crawling, no HTML parsing, no wasted tokens. Humans get a browse/search
+page at `/`.
+
+**Consume** — query from the CLI, or pull a whole docpack from a registry:
+
+```bash
+docdense search "blueprint routing" registry/      # local query
+docdense list registry/
+docdense get flask --from http://docs.internal:8900 -o ./flask   # pull over HTTP
+```
+
+Real run (one page → hosted → queried):
+
+```
+$ docdense pack https://deep-reinforce.com/ornith_1_0.html --name ornith --version 1.0 -o registry/ornith
+raw HTML: ~5,964 tokens → dense: ~2,308 tokens  (61% fewer)
+$ docdense list registry/
+ornith   v1.0   6 chunks  ~2,308 tokens  (61% denser than HTML)
+$ curl 'http://127.0.0.1:8900/api/search?q=reward+hacking' | jq '.results[0].heading_path'
+"… › Addressing Reward Hacking in Self-improvement"
+```
+
+Everything here is stdlib (`http.server`, `urllib`, `zipfile`) — no web
+framework, no vector DB, no API keys. A company can run it airgapped; the search
+is a small BM25-ish TF·IDF with a heading/title boost.
+
 ## Optional: an LLM distill pass
 
 The whole pipeline is intentionally **LLM-free** — that's the point. If you *do*
@@ -78,7 +140,11 @@ docdense/
   densify.py   boilerplate/dup removal + cross-page common-block stripping + token estimate
   chunk.py     heading-aware chunks with breadcrumb context + size targets
   corpus.py    run the pipeline; write md/jsonl/stats; token-savings report
-  cli.py       page / ingest
+  docpack.py   the portable condensed-docs artifact (dir or .docpack zip)
+  registry.py  index a folder of docpacks + TF·IDF search across their chunks
+  server.py    http.server registry: JSON API for agents + browse UI for humans
+  client.py    pull a docpack from a running registry
+  cli.py       page / ingest / pack / serve / list / search / get
 ```
 
 MIT. Stdlib only — no network libraries, no model, no API keys.

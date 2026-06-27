@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "docdense"
-version = "0.1.0"
+version = "0.2.0"
 description = "Intake documentation websites and turn them into dense, chunked, LLM-ready text deterministically (stdlib only) — strip HTML boilerplate, densify, heading-aware chunk — so an LLM never burns tokens on raw HTML. 61-75% fewer tokens."
 readme = "README.md"
 requires-python = ">=3.9"

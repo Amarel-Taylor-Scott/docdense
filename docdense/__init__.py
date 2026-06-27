@@ -8,7 +8,7 @@ raw HTML.
     print(corpus.stats_report(result["stats"]))
 """
 
-from . import fetch, extract, densify, chunk, corpus
+from . import fetch, extract, densify, chunk, corpus, docpack, registry
 
-__all__ = ["fetch", "extract", "densify", "chunk", "corpus"]
-__version__ = "0.1.0"
+__all__ = ["fetch", "extract", "densify", "chunk", "corpus", "docpack", "registry"]
+__version__ = "0.2.0"
